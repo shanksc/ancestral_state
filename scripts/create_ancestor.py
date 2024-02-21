@@ -34,7 +34,7 @@ def get_chr_size(target, contigs_info):
     target_chr = target.strip().split('.')[1]
     with open(contigs_info, 'r') as f:
         for line in f:
-            seq_id, size, chr = line.strip().split('\t')
+            _, size, chr = line.strip().split('\t')
             if target_chr in chr:
                 print(chr, size)
                 return int(size)
@@ -63,18 +63,21 @@ def get_ancs_in_block(ancs, block, ref_row):
     #for now lets just select blocks that are the same size as the reference and on the postitive strand
     #this should exist for most blocks-check this
     valid_seqs = []
-    ancestors_found = set([])
+    ancestors_found = {}
 
     for row in block:
         for anc in ancs:
-            #pick inferred ancestor that has same length as our reference, presumably this a decent way to be confident in our ancestral state
+            #find all ancestor sequences of interest
             #need to understand how cactus comes up with different ancestral contigs
-            #not carrying for strand
             if anc in row.sequence_name():
-                valid_seqs.append(row.sequence_name())
-                ancestors_found.add(anc)
+                #valid_seqs.append(row.sequence_name())
+                if anc in ancestors_found:
+                    ancestors_found[anc].append(row.sequence_name)
+                else:
+                    ancestors_found[anc] = [row.sequence_name]
+                break
 
-    return valid_seqs, len(ancestors_found) == len(ancs)
+    return ancestors_found, len(ancestors_found) == len(ancs)
 
 #1000 genomes method. 
 '''
@@ -95,6 +98,39 @@ N when both (b) and (c) disagree with (a)
 - (dash) when no there is no ancestral allele, this is a lineage-specific insertion
 . (dot) when there is no alignment, i.e. no data.
 '''
+#don't really need ancestor names at all, just need to check that there's enought to be valid 
+def get_anc_allele(col, ancs, anc_to_idx):
+
+    #look for any matching allele for each anc 
+    a, b, c = ancs
+
+    a_alleles = [col[i].upper() for i in anc_to_idx[a]]
+    b_alleles = [col[i].upper() for i in anc_to_idx[b]]
+    c_alleles = [col[i].upper() for i in anc_to_idx[c]]
+    #may need to modify this to handle tie-breaking 
+
+    #check for unanimous agreement
+    for base in a_alleles:
+        if base in b_alleles and base in c_alleles:
+            return base.upper()
+    
+    #check for partial agreement
+    for base in a_alleles:
+        if base in b_alleles or base in c_alleles:
+            return base.lower()
+    
+    #ancestors agree but not with human-chimp-bonobo
+    for base in b_alleles:
+        if base in c_alleles:
+            return 'N'
+    
+    #lineage specific-this should be rare?
+    return '-'
+    
+
+        
+'''
+#with this we have to select which anc seqs we want
 def get_anc_allele(col, ancs, valid_seq_to_idx):
     #ancs is in order of a, b, c 
     a, b, c = [col[valid_seq_to_idx[anc]] for anc in ancs]
@@ -110,7 +146,8 @@ def get_anc_allele(col, ancs, valid_seq_to_idx):
         return 'N'
     #lineage specific insertion
     return '-'
-
+'''
+    
 #since we need an hg38 based fasta, we need only original aligned bases
 def build_seq(anc_alleles, row):
     
@@ -144,20 +181,23 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
         total_blocks = 0
         valid_blocks = 0
         for block in mp:
+            
+            #if total_blocks % 1000 == 0 and total_blocks > 0:
+            #    print(f'blocks read: {total_blocks}')
             #The first row of each alignment block consists of a sequence from the reference genome.
             #The first row is on the forward (+) strand
             #this is in order of actual column sequence
             total_blocks += 1
-            seqs = block.get_column_sequences()
+            col_names = block.get_column_sequences()
             row = block.first_row()
-            valid_seqs, valid = get_ancs_in_block(ancs, block, row)
+            ancestor_names, valid = get_ancs_in_block(ancs, block, row)
             #valid, best_anc_seqs = get_best_ancs(valid_seqs, block
             #print(block)
             #sys.exit()
             if valid:
                 valid_blocks+=1
                 #print(valid_seqs, flush=True)
-
+                ''''
                 valid_seq_to_idx = {}
                 for i, seq in enumerate(seqs):
                     if seq in valid_seqs or seq in target:
@@ -169,7 +209,7 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
                     anc_alleles.append(get_anc_allele(block.get_column(i), ancs, valid_seq_to_idx))
 
                 anc_seq = AncSeq(seq=build_seq(anc_alleles, row), start=row.start(), end=row.start()+row.length(), strand=row.strand())
-                '''
+                
                 if abs((anc_seq.end - anc_seq.start) - len(anc_seq.seq)) > 1:
                     print(row)
                     print(row.length())
@@ -179,8 +219,20 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
                     print(block)
                     sys.exit()
                 '''
-                ancestral_seqs.append(anc_seq)
+                anc_to_indices = {anc:[] for anc in ancs}
+                for i, name in enumerate(col_names):
+                    prefix = remove_last_numbers(name)
+                    if prefix in ancs:
+                        anc_to_indices[prefix].append(i)
 
+                anc_alleles = []
+                for i in range(block.column_number()):
+                    anc_alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices))
+                
+                anc_seq = AncSeq(seq=build_seq(anc_alleles, row), start=row.start(), end=row.start()+row.length(), strand=row.strand())
+                ancestral_seqs.append(anc_seq)
+                #print(anc_seq.seq)
+                
                 #if len(ancestral_seqs) == 5:
                 #    return ancestral_seqs
 
@@ -263,7 +315,7 @@ def main():
 
     #check that it's sorted
     assert(sorted(anc_seqs, key = lambda x:x.start) == anc_seqs)
-    #check for only positive strands
+    #check for only positive strands in reference
     assert all(s.strand for s in anc_seqs)
 
     print(f'max end coord in taf {max(s.end for s in anc_seqs)}')
