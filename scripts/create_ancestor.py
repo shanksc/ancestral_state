@@ -126,7 +126,6 @@ def get_anc_allele(col, ancs, anc_to_idx):
     
     #lineage specific-this should be rare?
     return '-'
-    
 
         
 '''
@@ -175,7 +174,13 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
 
     taf_index = TafIndex(taf_file + '.tai', is_maf=False)
 
-    with AlignmentReader(taf_file, taf_index=taf_index, sequence_name=target, start=0, length=size) as mp:
+    #this is a temporary fix to deal with the taffy view error where the first chromosome isn't found in the index
+    #change this to potentially read from the .tai actually  
+    start=0
+    if target == 'hg38.chr1':
+        start = 10000
+    
+    with AlignmentReader(taf_file, taf_index=taf_index, sequence_name=target, start=start, length=size) as mp:
         print('iterating', flush=True)
         ancestral_seqs = []
         total_blocks = 0
