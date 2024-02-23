@@ -119,7 +119,7 @@ def get_anc_allele(col, ancs, anc_to_idx):
         if base in b_alleles or base in c_alleles:
             return base.lower()
     
-    #ancestors agree but not with human-chimp-bonobo
+    #other ancestors agree but not with human-chimp-bonobo
     for base in b_alleles:
         if base in c_alleles:
             return 'N'
