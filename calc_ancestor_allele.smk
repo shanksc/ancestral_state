@@ -11,7 +11,7 @@ print(config['taf'])
 print(config['ref'])
 print(config['ancestors'])
 print(config['contig-info'])
-print(config['compare'])
+#print(config['compare'])
 
 #pass config file
 rule all:

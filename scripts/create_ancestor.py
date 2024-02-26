@@ -4,8 +4,6 @@ import time
 import sys
 from taffy.lib import AlignmentReader, TafIndex
 #from Bio import SeqIO
-
-
 #may want to just use block obj to simplify later
 class AncSeq:
     def __init__(self, seq, start, end, strand):
@@ -99,7 +97,7 @@ N when both (b) and (c) disagree with (a)
 . (dot) when there is no alignment, i.e. no data.
 '''
 #don't really need ancestor names at all, just need to check that there's enought to be valid 
-def get_anc_allele(col, ancs, anc_to_idx):
+def get_anc_allele(col, ancs, anc_to_idx, row):
 
     #look for any matching allele for each anc 
     a, b, c = ancs
@@ -107,16 +105,28 @@ def get_anc_allele(col, ancs, anc_to_idx):
     a_alleles = [col[i].upper() for i in anc_to_idx[a]]
     b_alleles = [col[i].upper() for i in anc_to_idx[b]]
     c_alleles = [col[i].upper() for i in anc_to_idx[c]]
-    #may need to modify this to handle tie-breaking 
+
+    canidates = []
+
+    #may need to modify this to handle tie-breaking - we can use the reference/human anc 
 
     #check for unanimous agreement
     for base in a_alleles:
         if base in b_alleles and base in c_alleles:
             return base.upper()
+            #canidates.append(base)
     
-    #check for partial agreement
+    #if len(canidates) > 0:
+        
+    
+    #check for partial agreement with closest ancestor
     for base in a_alleles:
-        if base in b_alleles or base in c_alleles:
+        if base in b_alleles:
+            return base.lower()
+    
+    #check for partial agreement with farther ancestor
+    for base in a_alleles:
+        if base in c_alleles:
             return base.lower()
     
     #other ancestors agree but not with human-chimp-bonobo
@@ -124,7 +134,7 @@ def get_anc_allele(col, ancs, anc_to_idx):
         if base in c_alleles:
             return 'N'
     
-    #lineage specific-this should be rare?
+    #lineage specific
     return '-'
 
         
@@ -176,6 +186,7 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
 
     #this is a temporary fix to deal with the taffy view error where the first chromosome isn't found in the index
     #change this to potentially read from the .tai actually  
+    #this won't be needed when pull request goes through
     start=0
     if target == 'hg38.chr1':
         start = 10000
@@ -232,7 +243,7 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
 
                 anc_alleles = []
                 for i in range(block.column_number()):
-                    anc_alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices))
+                    anc_alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices, row))
                 
                 anc_seq = AncSeq(seq=build_seq(anc_alleles, row), start=row.start(), end=row.start()+row.length(), strand=row.strand())
                 ancestral_seqs.append(anc_seq)
