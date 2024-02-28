@@ -3,7 +3,11 @@ import re
 import time
 import sys
 from taffy.lib import AlignmentReader, TafIndex
+import pandas as pd
 #from Bio import SeqIO
+
+BUFFER=100000
+
 #may want to just use block obj to simplify later
 class AncSeq:
     def __init__(self, seq, start, end, strand):
@@ -15,10 +19,12 @@ class AncSeq:
 
         
 def get_args():
-    parser = argparse.ArgumentParser(description='create fasta containing ancestral states')
+    parser = argparse.ArgumentParser(description='check identity between alignments')
     #parser.add_argument('--ref', type=str, required=True, help='reference genome fasta (chm13, hg38)')
     parser.add_argument('--taf', type=str, required=True, help='taf (hg38/CHM13)')
-    parser.add_argument('--target', type=str, required=True, help='ex. hg38.chr20')
+    parser.add_argument('--ref', type=str, required=False, help='hg38/hs1', default='hg38')
+    parser.add_argument('--tsv', type=str, required=True, help='tsv containing windows')
+    parser.add_argument('--window-size', type=int, required=False, help='size of windows in bp', default=5000)
     parser.add_argument('--ancs', type=str, required=True, nargs='+', help='Anc4.Anc4.refChr, Anc3.Anc3.refChr etc.')
     #parser.add_argument('--chr', type=int, required=True, help='chr corresponding to taf')
     parser.add_argument('--contigs-info', type=str, required=True, help='tsv containing contig, size, chr corresponding to reference (hg38/CHM13)')
@@ -26,41 +32,9 @@ def get_args():
 
     return parser.parse_args()
 
-
-def get_chr_size(target, contigs_info):
-
-    target_chr = target.strip().split('.')[1]
-    with open(contigs_info, 'r') as f:
-        for line in f:
-            _, size, chr = line.strip().split('\t')
-            if target_chr in chr:
-                print(chr, size)
-                return int(size)
-
-    return None
             
-'''
-def all_ancs_in_block(ancs, seqs):
-    valid_seqs = set([])
-    count = 0
-
-    for anc in ancs:
-        for seq in seqs:
-            # check that anc is substring
-            if anc in seq:
-                valid_seqs.add(seq)
-                count += 1
-                break
-
-    return count == len(ancs), valid_seqs
-'''
 #we need a simple heuristic for selecting anc sequences
-#for now we should be able to get 
 def get_ancs_in_block(ancs, block, ref_row):
-
-    #for now lets just select blocks that are the same size as the reference and on the postitive strand
-    #this should exist for most blocks-check this
-    valid_seqs = []
     ancestors_found = {}
 
     for row in block:
@@ -96,63 +70,27 @@ N when both (b) and (c) disagree with (a)
 - (dash) when no there is no ancestral allele, this is a lineage-specific insertion
 . (dot) when there is no alignment, i.e. no data.
 '''
-#don't really need ancestor names at all, just need to check that there's enought to be valid 
+#return 1 if unanimous agreement 0 else
 def get_anc_allele(col, ancs, anc_to_idx, row):
 
+    #print(col)
+    #print(ancs)
+    #print(anc_to_idx)
     #look for any matching allele for each anc 
     a, b, c = ancs
 
+    #print(a, b, c)
     a_alleles = [col[i].upper() for i in anc_to_idx[a]]
     b_alleles = [col[i].upper() for i in anc_to_idx[b]]
     c_alleles = [col[i].upper() for i in anc_to_idx[c]]
 
-    canidates = []
-
-    #may need to modify this to handle tie-breaking - we can use the reference/human anc 
 
     #check for unanimous agreement
     for base in a_alleles:
         if base in b_alleles and base in c_alleles:
-            return base.upper()
-            #canidates.append(base)
-    
-    #check for partial agreement with closest ancestor
-    for base in a_alleles:
-        if base in b_alleles:
-            return base.lower()
-    
-    #check for partial agreement with farther ancestor
-    for base in a_alleles:
-        if base in c_alleles:
-            return base.lower()
-    
-    #other ancestors agree but not with human-chimp-bonobo
-    for base in b_alleles:
-        if base in c_alleles:
-            return 'N'
-    
-    #lineage specific
-    return '-'
-
-        
-'''
-#with this we have to select which anc seqs we want
-def get_anc_allele(col, ancs, valid_seq_to_idx):
-    #ancs is in order of a, b, c 
-    a, b, c = [col[valid_seq_to_idx[anc]] for anc in ancs]
-
-    #unanimous 
-    if a == b == c:
-        return a.upper()
-    #gap in sister/partial agreement
-    elif a == c or a == b:
-        return a.lower()
-    #both b and c disagree with a
-    elif b == c:
-        return 'N'
-    #lineage specific insertion
-    return '-'
-'''
+            #return base.upper()
+            return 1
+    return 0
     
 #since we need an hg38 based fasta, we need only original aligned bases
 def build_seq(anc_alleles, row):
@@ -175,20 +113,91 @@ def remove_last_numbers(input_string):
 
     return re.sub(r'\d+$', '', input_string)
 
+
 #iterate through blocks, getting the inferred ancestral sequence and the interval of the sequence
 #we may want to refactor this to just use the block obj later.
-def get_ancestral_seqs(taf_file, target, ancs, size):
+def get_identity(taf_file, ancs, ref, windows, window_length, sizes):
 
     taf_index = TafIndex(taf_file + '.tai', is_maf=False)
 
-    #this is a temporary fix to deal with the taffy view error where the first chromosome isn't found in the index
-    #change this to potentially read from the .tai actually  
-    #this won't be needed when pull request goes through
-    start=0
-    if target == 'hg38.chr1':
-        start = 10000
-    
-    with AlignmentReader(taf_file, taf_index=taf_index, sequence_name=target, start=start, length=size) as mp:
+    #windows here
+    for n in ['19']:
+        target = f'{ref}.chr{n}'
+        #for window_start, _ in windows[n]:
+            #print(target, window_start, window_length, sizes[n])
+        with AlignmentReader(taf_file, taf_index, sequence_name=target, start=10000, length=sizes[n]) as mp:
+            window_start, _ = windows[n].pop(0)
+            equ = 0 #identical bases
+            tot = 0 #total bases
+                
+            for block in mp:
+                #print(block)
+                col_names = block.get_column_sequences()
+                row = block.first_row()
+                #get next window
+                if row.start() >= window_start + window_length:
+                    identity = round(equ / tot, 5)
+                    print(f'{n}\t{window_start}\t{identity}', flush=True)
+                    equ = 0
+                    tot = 0
+                    if len(windows[n]) == 0:
+                        break
+                    window_start, _ = windows[n].pop(0)
+                    #print(f'next window: {window_start}')
+                    #print(row.start(), flush=True)
+
+                #do we want percent identity between ancestors or between our primates?
+                ancestor_names, valid = get_ancs_in_block(ancs, block, row)
+
+                #print(row.length())
+                if valid:  
+                    #get identity between ancs
+                    #print(ancestor_names)
+                    anc_to_indices = {anc:[] for anc in ancs}
+                    for i, name in enumerate(col_names):
+                        prefix = remove_last_numbers(name)
+                        if prefix in ancs:
+                            anc_to_indices[prefix].append(i)
+                    #print(anc_to_indices)
+
+                    alleles = []
+                    for i in range(block.column_number()):
+                        #print(block.get_column(i))
+                        #try:
+                        col = block.get_column(i)
+                        #except:
+                            #continue
+                        #print(col)
+                        #this should always be true 
+                        #if len(col) != row.length():
+                            #print(col)
+                            #print(row.length())
+                            #sys.exit()
+                        #only add it if it's in our original window
+                        if row.start() + i >= window_start and row.start() + i < window_start + window_length:
+                            #print(row.start())
+                            #sys.exit()
+                            alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices, row))
+                        
+                    equ += sum(alleles)
+                    tot += len(alleles)
+                    #print(equ/tot)
+                    #sys.exit()
+                    
+            
+            #identity = round(equ / tot, 5)
+            #print(f'{n}\t{window_start}\t{identity}')
+                    #maybe we treat this as identity == 0
+                    #print(ancestor_names)
+
+                    #raise ValueError("Block doesn't have complete ancestral coverage")
+
+
+
+
+            
+    '''
+    with AlignmentReader(taf_file, taf_index=taf_index, sequence_name=target, start=start, length=window_length) as mp:
         print('iterating', flush=True)
         ancestral_seqs = []
         total_blocks = 0
@@ -210,7 +219,7 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
             if valid:
                 valid_blocks+=1
                 #print(valid_seqs, flush=True)
-                ''''
+                
                 valid_seq_to_idx = {}
                 for i, seq in enumerate(seqs):
                     if seq in valid_seqs or seq in target:
@@ -231,7 +240,7 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
                     print(anc_seq.start, anc_seq.end, len(anc_seq.seq), abs((anc_seq.end - anc_seq.start) - len(anc_seq.seq)))
                     print(block)
                     sys.exit()
-                '''
+                
                 anc_to_indices = {anc:[] for anc in ancs}
                 for i, name in enumerate(col_names):
                     prefix = remove_last_numbers(name)
@@ -244,98 +253,51 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
                 
                 anc_seq = AncSeq(seq=build_seq(anc_alleles, row), start=row.start(), end=row.start()+row.length(), strand=row.strand())
                 ancestral_seqs.append(anc_seq)
-                #print(anc_seq.seq)
-                
-                #if len(ancestral_seqs) == 5:
-                #    return ancestral_seqs
 
     print(f'valid blocks: {valid_blocks}')
     print(f'total blocks: {total_blocks}')
     return ancestral_seqs
+    '''
 
-#ancestral seqs is ordered
-#return a generator 
-def get_fasta(anc_seqs, size, line_length=80):
-    #zero based
-    total_chars = 0
-    gap_chars_written = 0
-    last_end = 0
-    for seq in anc_seqs:
-        gap_str = '.' * (seq.start - last_end)
-        assert (seq.start - last_end) >= 0
+def get_windows(tsv, window_size):
 
-        last_end = seq.end
-
-        total_chars += len(gap_str)
-        total_chars += len(seq.seq)
-        gap_chars_written += len(gap_str)
-
-        if len(gap_str) > 0:
-            for i in range(0, len(gap_str), line_length):
-                yield gap_str[i:i + line_length]
-        for i in range(0, len(seq.seq), line_length):
-            yield seq.seq[i:i + line_length]
-
-    print(f'gap chars: {gap_chars_written}')
-    print(f'total chars: {total_chars}')
-    print(f'last-last-end: {last_end}')
-    print(f'size {size}')
-    #fill end of contig
-    if last_end < size:
-        gap_str = '.' * (size - last_end)
-        total_chars += len(gap_str)
-        for i in range(0, len(gap_str), line_length):
-            yield gap_str[i:i + line_length]
+    windows = {str(n):[] for n in range(1,23)}
     
-    print(f'total_chars after blocks {total_chars}')
+    with open(tsv, 'r') as f:
+        next(f) #skip header
+        for line in f:
+            chr, pos, _ = line.strip().split('\t')
 
-
-def write_fasta(anc_seqs, target, size, out, line_length=80):
+            #make zero based
+            start = int(pos)-1
+            windows[chr].append((start, start + window_size))
     
-    total_chars = 0
-    with open(out, 'w') as f:
-        f.write(f'>{target}\n')
-        buffer = ''
+    return windows
+ 
 
-        for base in get_fasta(anc_seqs, size):
-            buffer += base
-            total_chars += len(base)
+def get_chr_sizes(contigs_info):
 
-            if len(buffer) >= line_length:
-                f.write(buffer[:line_length] + '\n')
-                buffer = buffer[line_length:]
+    sizes = {str(n):0 for n in range(1,23)}
+    with open(contigs_info, 'r') as f:
+        for line in f:
+            _, size, chr = line.strip().split('\t')
+            if len(chr) == 5:
+                chr = chr[-2:]
+            else:
+                chr = chr[-1]
+            if chr in sizes:
+                sizes[chr] = int(size)
 
-        if buffer:
-            f.write(buffer + '\n')
-
-    return total_chars
+    return sizes
 
 
 def main():
     args = get_args()
-    #iterate through each block in sorted order- fill gaps with . to represent no alignment data
-    size = get_chr_size(args.target, args.contigs_info)
-    if size is None:
-        print('error could not get size of target chr')
-        sys.exit()
-
-    print(f'{args.target} size: {size}')
     
-    start_time = time.time()
-    anc_seqs = get_ancestral_seqs(args.taf, args.target, args.ancs, size)
-    end_time = time.time()
-    
-    print(f'time: {end_time - start_time}')
+    windows = get_windows(args.tsv, args.window_size)
+    sizes = get_chr_sizes(args.contigs_info)
+    get_identity(args.taf, args.ancs, args.ref, windows, args.window_size, sizes)
 
-    #check that it's sorted
-    assert(sorted(anc_seqs, key = lambda x:x.start) == anc_seqs)
-    #check for only positive strands in reference
-    assert all(s.strand for s in anc_seqs)
-
-    print(f'max end coord in taf {max(s.end for s in anc_seqs)}')
-
-    total_chars = write_fasta(anc_seqs, args.target, size, args.o)
-    print(f'{total_chars} sequence characters written to fasta')
 
 if __name__ == '__main__':
     main()

@@ -3,8 +3,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-usage = '<fasta 1> <fasta 2>'
-if len(sys.argv) != 3:
+usage = '<fasta 1> <fasta 2> <out>'
+if len(sys.argv) != 4:
     print(usage)
     sys.exit()
 
@@ -71,7 +71,7 @@ print(f'u: {np.mean(diffs)}')
 print(f'sd: {np.std(diffs)}')
 print(f'max diff length: {np.amax(diffs)}')
 print(f'position of max diff: {positions[np.argmax(diffs)]}')
-#np.save('diffs', diffs)
+np.save(sys.argv[3], diffs)
 print(eq/tot)
 #print(f'base 1 uppercase {diff_upper_1/tot_diffs}')
 #print(f'base 2 uppercase {diff_upper_2/tot_diffs}')
