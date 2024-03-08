@@ -1,0 +1,17 @@
+taf: 8-t2t-apes-2023v2_wAnc.hg38.taf.gz
+ref: hg38
+working: working_rep
+contig-info: reference/autosomes.tsv
+  
+#let human-chimp ancestral sequence (3), the chimp sequence (2), and the human-chimp-orangutan ancestral sequence (1)
+#in our case we want a comparable ancestral sequence human-chimp-bonobo for anc3 etc. 
+#we might want to create new alignments that are 6 way 10 way etc. 
+#look at guide tree from cactus alignment to determine this 
+ancestors:
+  anc3: Anc4.Anc4refChr
+  anc2: Anc3.Anc3refChr
+  anc1: Anc1.Anc1refChr
+
+
+
+
