@@ -16,7 +16,7 @@ print(config['contig-info'])
 #pass config file
 rule all:
     input:
-        f"{config['working']}/{config['ref']}.ready.txt",
+        #f"{config['working']}/{config['ref']}.ready.txt",
         #expand("{config['working']}/{config['ref']}_{autosome}_processed.txt", autosome=range(1, 23))
         #expand("{config['working']}/{config['ref']}_{autosome}.fa", autosome=range(1, 23))
         expand('{prefix}_chr{autosome}.fa', autosome=range(1,23), prefix=f"{config['working']}/{config['ref']}"),

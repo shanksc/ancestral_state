@@ -9,7 +9,7 @@ if len(sys.argv) != 3:
 df = pd.read_csv(sys.argv[1], sep='\t')
 
 cutoff = df['mismatches'].quantile(.99)
-print(f'99.9th percentile: {cutoff}')
+print(f'99th percentile: {cutoff}')
 
 df = df[df['mismatches'] > cutoff]
 df.to_csv(sys.argv[2], sep='\t', index=False)

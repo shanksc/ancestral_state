@@ -278,7 +278,7 @@ def get_fasta(anc_seqs, size, line_length=80):
 
     print(f'gap chars: {gap_chars_written}')
     print(f'total chars: {total_chars}')
-    print(f'last-last-end: {last_end}')
+    #print(f'last-last-end: {last_end}')
     print(f'size {size}')
     #fill end of contig
     if last_end < size:

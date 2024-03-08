@@ -30,15 +30,15 @@ stats.set_index('chr', inplace=True)
 epo_stats.set_index('chr', inplace=True)
 combined_stats = pd.concat([stats['sum'], epo_stats['sum']], axis=1, keys=['stats', 'epo_stats'])
 
-fig, ax = plt.subplots(figsize=(12, 6))
+fig, ax = plt.subplots(figsize=(12, 4))
 bar_width = 0.3
 bar_positions = np.arange(len(combined_stats.index))
 
 # Bar for 'stats'
-ax.bar(bar_positions - bar_width/2, combined_stats['stats'], bar_width, label='T2T Primate Alignment', color='#377eb8')
+ax.bar(bar_positions - bar_width/2, combined_stats['stats'], bar_width, label='T2T', color='#377eb8')
 
 # Bar for 'epo_stats'
-ax.bar(bar_positions + bar_width/2, combined_stats['epo_stats'], bar_width, label='EPO Alignment', color='#ff7f00')
+ax.bar(bar_positions + bar_width/2, combined_stats['epo_stats'], bar_width, label='Ensembl', color='#ff7f00')
 
 # Set labels and title
 ax.set_ylabel("Ancestral Bases Annotated")
