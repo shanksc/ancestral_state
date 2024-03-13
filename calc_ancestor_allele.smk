@@ -17,19 +17,18 @@ print(config['contig-info'])
 rule all:
     input:
         #f"{config['working']}/{config['ref']}.ready.txt",
-        #expand("{config['working']}/{config['ref']}_{autosome}_processed.txt", autosome=range(1, 23))
-        #expand("{config['working']}/{config['ref']}_{autosome}.fa", autosome=range(1, 23))
+        expand('{prefix}_{autosome}.txt', autosome=range(1,23), prefix=f"{config['working']}/{config['ref']}"),
         expand('{prefix}_chr{autosome}.fa', autosome=range(1,23), prefix=f"{config['working']}/{config['ref']}"),
         expand('{prefix}_chr{autosome}_stats.txt', autosome=range(1,23), prefix=f"{config['working']}/{config['ref']}")
-        #f"{config['taf']}.filtered"
 
 #computing only autosomes
 #create empty stats files for each chr 
-checkpoint create_stats:
+rule create_stats:
     input:
         config['taf']
     output:
-        f"{config['working']}/{config['ref']}.ready.txt"
+        expand('{prefix}_{autosome}.txt', autosome=range(1,23), prefix=f"{config['working']}/{config['ref']}")
+        #f"{config['working']}/{config['ref']}.ready.txt"
     run:
         # Create empty files for autosomes
         #open(f"{config['working']}/{config['ref']}.ready.txt", 'w').close()

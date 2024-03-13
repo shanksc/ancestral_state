@@ -96,7 +96,6 @@ only two extant sequences in the alignment, but (a) and (b) agree.
 N when both (b) and (c) disagree with (a)
 - (dash) when no there is no ancestral allele, this is a lineage-specific insertion
 . (dot) when there is no alignment, i.e. no data.
-'''
 #don't really need ancestor names at all, just need to check that there's enought to be valid 
 def get_anc_allele(col, ancs, anc_to_idx, row):
 
@@ -138,9 +137,9 @@ def get_anc_allele(col, ancs, anc_to_idx, row):
         
 '''
 #with this we have to select which anc seqs we want
-def get_anc_allele(col, ancs, valid_seq_to_idx):
+def get_anc_allele(col, ancs, anc_to_indices):
     #ancs is in order of a, b, c 
-    a, b, c = [col[valid_seq_to_idx[anc]] for anc in ancs]
+    a, b, c = [col[anc_to_indices[anc]] for anc in ancs]
 
     #unanimous 
     if a == b == c:
@@ -153,7 +152,6 @@ def get_anc_allele(col, ancs, valid_seq_to_idx):
         return 'N'
     #lineage specific insertion
     return '-'
-'''
     
 #since we need an hg38 based fasta, we need only original aligned bases
 def build_seq(anc_alleles, row):
@@ -196,8 +194,6 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
         valid_blocks = 0
         for block in mp:
             
-            #if total_blocks % 1000 == 0 and total_blocks > 0:
-            #    print(f'blocks read: {total_blocks}')
             #The first row of each alignment block consists of a sequence from the reference genome.
             #The first row is on the forward (+) strand
             #this is in order of actual column sequence
@@ -205,50 +201,25 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
             col_names = block.get_column_sequences()
             row = block.first_row()
             ancestor_names, valid = get_ancs_in_block(ancs, block, row)
-            #valid, best_anc_seqs = get_best_ancs(valid_seqs, block
-            #print(block)
-            #sys.exit()
+
             if valid:
                 valid_blocks+=1
-                #print(valid_seqs, flush=True)
-                ''''
-                valid_seq_to_idx = {}
-                for i, seq in enumerate(seqs):
-                    if seq in valid_seqs or seq in target:
-                        valid_seq_to_idx[remove_last_numbers(seq)] = i
 
-                #change this so that we look for across multiple ancestral sequences rather than those that have exact length
-                anc_alleles = []
-                for i in range(block.column_number()):
-                    anc_alleles.append(get_anc_allele(block.get_column(i), ancs, valid_seq_to_idx))
-
-                anc_seq = AncSeq(seq=build_seq(anc_alleles, row), start=row.start(), end=row.start()+row.length(), strand=row.strand())
-                
-                if abs((anc_seq.end - anc_seq.start) - len(anc_seq.seq)) > 1:
-                    print(row)
-                    print(row.length())
-                    print(row.bases())
-                    print(len(row.bases()))
-                    print(anc_seq.start, anc_seq.end, len(anc_seq.seq), abs((anc_seq.end - anc_seq.start) - len(anc_seq.seq)))
-                    print(block)
-                    sys.exit()
-                '''
                 anc_to_indices = {anc:[] for anc in ancs}
                 for i, name in enumerate(col_names):
                     prefix = remove_last_numbers(name)
                     if prefix in ancs:
-                        anc_to_indices[prefix].append(i)
+                        anc_to_indices[prefix] = i
 
+                #print(col_names)
+                #print(anc_to_indices)
                 anc_alleles = []
                 for i in range(block.column_number()):
-                    anc_alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices, row))
-                
+                    anc_alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices))
+                    #anc_alleles.append(get_anc_allele(block.get_column(i), ancs, anc_to_indices, row))
+                #print(anc_alleles)
                 anc_seq = AncSeq(seq=build_seq(anc_alleles, row), start=row.start(), end=row.start()+row.length(), strand=row.strand())
                 ancestral_seqs.append(anc_seq)
-                #print(anc_seq.seq)
-                
-                #if len(ancestral_seqs) == 5:
-                #    return ancestral_seqs
 
     print(f'valid blocks: {valid_blocks}')
     print(f'total blocks: {total_blocks}')
@@ -288,7 +259,7 @@ def get_fasta(anc_seqs, size, line_length=80):
         for i in range(0, len(gap_str), line_length):
             yield gap_str[i:i + line_length]
     
-    print(f'total_chars after blocks {total_chars}')
+    print(f'total chars after blocks {total_chars}')
 
 
 def write_fasta(anc_seqs, target, size, out, line_length=80):
