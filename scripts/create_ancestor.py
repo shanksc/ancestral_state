@@ -38,7 +38,8 @@ def get_chr_size(target, contigs_info):
                 return int(size)
 
     return None
-            
+
+#for single-copy          
 '''
 def all_ancs_in_block(ancs, seqs):
     valid_seqs = set([])
