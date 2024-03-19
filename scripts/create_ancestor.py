@@ -15,7 +15,7 @@ class AncSeq:
 
         
 def get_args():
-    parser = argparse.ArgumentParser(description='create fasta containing ancestral states')
+    parser = argparse.ArgumentParser(description='create fasta containing ancestral alleles')
     #parser.add_argument('--ref', type=str, required=True, help='reference genome fasta (chm13, hg38)')
     parser.add_argument('--taf', type=str, required=True, help='taf (hg38/CHM13)')
     parser.add_argument('--target', type=str, required=True, help='ex. hg38.chr20')
@@ -96,47 +96,7 @@ only two extant sequences in the alignment, but (a) and (b) agree.
 N when both (b) and (c) disagree with (a)
 - (dash) when no there is no ancestral allele, this is a lineage-specific insertion
 . (dot) when there is no alignment, i.e. no data.
-#don't really need ancestor names at all, just need to check that there's enought to be valid 
-def get_anc_allele(col, ancs, anc_to_idx, row):
-
-    #look for any matching allele for each anc 
-    a, b, c = ancs
-
-    a_alleles = [col[i].upper() for i in anc_to_idx[a]]
-    b_alleles = [col[i].upper() for i in anc_to_idx[b]]
-    c_alleles = [col[i].upper() for i in anc_to_idx[c]]
-
-    canidates = []
-
-    #may need to modify this to handle tie-breaking - we can use the reference/human anc 
-
-    #check for unanimous agreement
-    for base in a_alleles:
-        if base in b_alleles and base in c_alleles:
-            return base.upper()
-            #canidates.append(base)
-    
-    #check for partial agreement with closest ancestor
-    for base in a_alleles:
-        if base in b_alleles:
-            return base.lower()
-    
-    #check for partial agreement with farther ancestor
-    for base in a_alleles:
-        if base in c_alleles:
-            return base.lower()
-    
-    #other ancestors agree but not with human-chimp-bonobo
-    for base in b_alleles:
-        if base in c_alleles:
-            return 'N'
-    
-    #lineage specific
-    return '-'
-
-        
 '''
-#with this we have to select which anc seqs we want
 def get_anc_allele(col, ancs, anc_to_indices):
     #ancs is in order of a, b, c 
     a, b, c = [col[anc_to_indices[anc]] for anc in ancs]
@@ -153,6 +113,7 @@ def get_anc_allele(col, ancs, anc_to_indices):
     #lineage specific insertion
     return '-'
     
+
 #since we need an hg38 based fasta, we need only original aligned bases
 def build_seq(anc_alleles, row):
     
@@ -174,6 +135,7 @@ def remove_last_numbers(input_string):
 
     return re.sub(r'\d+$', '', input_string)
 
+
 #iterate through blocks, getting the inferred ancestral sequence and the interval of the sequence
 #we may want to refactor this to just use the block obj later.
 def get_ancestral_seqs(taf_file, target, ancs, size):
@@ -181,8 +143,7 @@ def get_ancestral_seqs(taf_file, target, ancs, size):
     taf_index = TafIndex(taf_file + '.tai', is_maf=False)
 
     #this is a temporary fix to deal with the taffy view error where the first chromosome isn't found in the index
-    #change this to potentially read from the .tai actually  
-    #this won't be needed when pull request goes through
+    #this is fixed in newest taffy update 
     start=0
     if target == 'hg38.chr1':
         start = 10000
