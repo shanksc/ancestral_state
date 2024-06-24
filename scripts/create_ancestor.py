@@ -85,7 +85,7 @@ we look at the human-chimp (a) ancestral sequence and compare it to the chimp
 (b) and to the human-chimp-orang (c) ancestral sequences. We use the following
 convention for the ancestral sequence:
 
-In our case let (a) be the human-chimp-bonobo, (b) human-chimp-bonobo-gorilla, (c) human-chimp-bonobo-gorilla-orangutan
+In our case let (a) be the human-chimp-bonobo, (b) chimp-bonobo, (c) human-chimp-bonobo-gorilla
 
 uppercase when all 3 –(a), (b) and (c)– sequences agree
 lowercase when:
