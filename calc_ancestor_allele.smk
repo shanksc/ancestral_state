@@ -14,7 +14,7 @@ print(config['contig-info'])
 #print(config['compare'])
 
 
-chroms=list(range(1,23)) + ['chrX', 'chrY']
+chroms=list(range(1,23)) + ['X', 'Y']
 #pass config file
 rule all:
     input:
