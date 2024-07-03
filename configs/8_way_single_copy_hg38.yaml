@@ -1,7 +1,7 @@
-taf: 8-t2t-apes-2023v2_wAnc.hg38.single-copy.taf.gz
+taf: alignments/8-t2t-apes-2023v2_wAnc.hg38.single-copy.taf.gz
 ref: hg38
-working: working_single_copy
-contig-info: reference/autosomes.tsv
+working: working_single_copy_w_x_y
+contig-info: reference/chromosomes.tsv
 
 #human-chimp-bonobo ancestral sequence (3), the bonobo-chimp sequence (2), and the human-chimp-bonobo-gorilla ancestral sequence (1)
 ancestors:
@@ -9,6 +9,6 @@ ancestors:
   anc2: Anc5.Anc5refChr
   anc1: Anc3.Anc3refChr
 
-
+#adding felsing 
 
 
